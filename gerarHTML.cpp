@@ -1,0 +1,247 @@
+//
+// Created by Daniel on 27/08/2024.
+//
+
+#include "gerarHTML.h"
+
+namespace gHTML{
+
+std::string htmlContruido(std::string imbutar){
+
+return R"(<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle</title>
+<style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .button {
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button.auto {
+            background-color: #30b91d;
+        }
+        .button.auto:hover {
+            background-color: #25ad13;
+        }
+        .button.control {
+            background-color: #3a546b;
+        }
+        .button.control:hover {
+            background-color: #243b50;
+        }
+        .button.reset {
+            background-color: #dc3545;
+        }
+        .button.reset:hover {
+            background-color: #9e1d2a;
+        }
+        .grid {
+            display: grid;
+            gap: 2px;
+            margin-top: 10px;
+        }
+        .tile {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            font-weight: bold;
+            <!--border: 1px solid black;-->
+            cursor: pointer;
+            border-radius: 10px;
+        }
+        .tile.empty {
+            background-color:  rgb(26, 26, 26);
+            cursor: default;
+        }
+        .tile.filled {
+            background-color: #2d69a8;
+            color: rgb(255, 230, 0);
+        }
+        #moves,.slider-container{
+            color:rgb(255, 255, 255);
+            font-size: large;
+        }
+    </style>
+</head>
+<body style="background-color: rgb(26, 26, 26);">
+    <div class="container">
+        <button id="autoToggle" class="button auto">Iniciar Modo Automatico</button>
+  
+        <div>
+            <button id="prevState" class="button control">Anterior</button>
+            <button id="nextState" class="button control">Proximo</button>
+            <button id="reset" class="button reset">Resetar</button>
+        </div>
+  
+        <div class="slider-container">
+            <label for="speed">Velocidade de cada movimento:</label>
+            <input type="range" id="speed" class="slider" min="100" max="2000" step="100" value="1000">
+            <span id="speedValue">1 s</span>
+        </div>
+  
+        <div id="moves">Movimentos: 0</div>
+  
+        <div id="puzzle" class="grid"></div>
+    </div>
+
+
+    <script>
+        const states =)"+ imbutar + R"(;
+
+        let tiles = [...states[0]];
+        let step = 0;
+        let isAuto = false;
+        let interval;
+
+        const rows = tiles.length;
+        const cols = tiles[0].length;
+        const puzzleGrid = document.getElementById('puzzle');
+        const autoToggle = document.getElementById('autoToggle');
+        const prevState = document.getElementById('prevState');
+        const nextState = document.getElementById('nextState');
+        const speedSlider = document.getElementById('speed');
+        const speedValue = document.getElementById('speedValue');
+        const resetButton = document.getElementById('reset');
+        const movesDisplay = document.getElementById('moves');
+
+        function updateTileSize() {
+            const tileSize = 100;
+            puzzleGrid.style.gridTemplateColumns = `repeat(${cols}, ${tileSize}px)`;
+            puzzleGrid.style.gridTemplateRows = `repeat(${rows}, ${tileSize}px)`;
+        }
+
+        function renderPuzzle() {
+            puzzleGrid.innerHTML = '';
+            updateTileSize();
+            tiles.forEach((row, rowIndex) => {
+                row.forEach((tile, colIndex) => {
+                    const tileElement = document.createElement('div');
+                    tileElement.className = `tile ${tile === 0 ? 'empty' : 'filled'}`;
+                    tileElement.textContent = tile !== 0 ? tile : '';
+                    tileElement.onclick = () => moveTile(rowIndex, colIndex);
+                    puzzleGrid.appendChild(tileElement);
+                });
+            });
+            movesDisplay.textContent = `Movimentos: ${step}`;
+        }
+
+        function moveTile(rowIndex, colIndex) {
+            if (isAuto) return;
+
+            const emptyPos = findEmptyTile();
+            const isAdjacent = checkAdjacency(emptyPos, { row: rowIndex, col: colIndex });
+
+            if (isAdjacent) {
+                const newTiles = tiles.map(row => [...row]);
+                [newTiles[emptyPos.row][emptyPos.col], newTiles[rowIndex][colIndex]] =
+                    [newTiles[rowIndex][colIndex], newTiles[emptyPos.row][emptyPos.col]];
+                tiles = newTiles;
+                step++;
+                renderPuzzle();
+            }
+        }
+
+        function findEmptyTile() {
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    if (tiles[row][col] === 0) {
+                        return { row, col };
+                    }
+                }
+            }
+        }
+
+        function checkAdjacency(emptyPos, tilePos) {
+            const rowDiff = Math.abs(emptyPos.row - tilePos.row);
+            const colDiff = Math.abs(emptyPos.col - tilePos.col);
+            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        }
+
+        function handleAutoToggle() {
+            isAuto = !isAuto;
+            autoToggle.textContent = isAuto ? 'Parar Modo Automatico' : 'Iniciar Modo Automatico';
+            if (isAuto) {
+                step = 0;
+                tiles = [...states[0]];
+                renderPuzzle();
+                interval = setInterval(() => {
+                    step++;
+                    if (step < states.length) {
+                        tiles = [...states[step]];
+                        renderPuzzle();
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, speedSlider.value);
+            } else {
+                clearInterval(interval);
+            }
+        }
+
+        function handleNextState() {
+            step = Math.min(step + 1, states.length - 1);
+            tiles = [...states[step]];
+            renderPuzzle();
+            prevState.disabled = step === 0;
+            nextState.disabled = step === states.length - 1;
+        }
+
+        function handlePreviousState() {
+            step = Math.max(step - 1, 0);
+            tiles = [...states[step]];
+            renderPuzzle();
+            prevState.disabled = step === 0;
+            nextState.disabled = step === states.length - 1;
+        }
+
+        function handleSpeedChange(event) {
+            speedValue.textContent = `${event.target.value / 1000} s`;
+            if (isAuto) {
+                clearInterval(interval);
+                interval = setInterval(() => {
+                    step++;
+                    if (step < states.length) {
+                        tiles = [...states[step]];
+                        renderPuzzle();
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, event.target.value);
+            }
+        }
+
+        function handleReset() {
+            step = 0;
+            tiles = [...states[0]];
+            isAuto = false;
+            autoToggle.textContent = 'Iniciar Modo Automatico';
+            clearInterval(interval);
+            renderPuzzle();
+        }
+
+        autoToggle.addEventListener('click', handleAutoToggle);
+        nextState.addEventListener('click', handleNextState);
+        prevState.addEventListener('click', handlePreviousState);
+        speedSlider.addEventListener('input', handleSpeedChange);
+        resetButton.addEventListener('click', handleReset);
+
+        renderPuzzle();
+    </script>
+</body>
+</html>)";
+
+}
+}
